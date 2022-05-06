@@ -1,0 +1,292 @@
+<?php
+
+define("WEB_PATH", "../");
+
+define("PAGE_TITLE", "The Motion Physics of Ecco the Dolphin");
+define("PAGE_DESCRIPTION", "A technical artical describing the motion physics of Ecco the Dolphin.");
+define("PAGE_DIR", "/ecco-motion-physics");
+
+include(WEB_PATH . "header.php");
+
+?>
+
+    <img src="card.png" class="panel_header" alt="media restoration" />
+
+<div class='document'>
+<div class='dialog_body'>
+
+<h1>Ecco Motion Physics</h1>
+<h2>The Motion Physics of Ecco the Dolphin</h2>
+<div class="byline_top">December 21st, 2020 by Johnny "Arkonviox" de Alba</div>
+
+<div class='caption_r'>
+<span>
+
+    <img src="ecco-motion-physics.gif" alt="ecco the dophin sinewave motion" />
+    <p>Dolphin movement in Ecco the Dolphin is unique from any other game.</p>
+
+</span>
+</div>
+
+<p>Ecco the Dolphin uses a precalculated table of sinewave values to update the players position between transitions. A transition occurs when the player causes Ecco to move in one of eight directions. These directions include up, up-right, right, right-down, down, down-left, left, up-left and up. The transition itself is a set of animation frames that allow Ecco to face a desired direction. As a transition occurs, Ecco is repositioned according to the precalculated sinewave table. More interestingly this same sinewave table is used in conjunction with another table to create the ripple effect used on the message screens.</p>
+
+<h2 class="underline">Why Use a Sinewave Table for Movement?</h2>
+
+<p>The purpose of using a sinewave table for movement is to allow the dolphins in the game (including Ecco) to have fluid, wave like motions. Without this table it would be impossible for the player to quickly move Ecco in uninterrupted perfect circles, half circles or periodic waves. </p>
+
+<p class="red align_c bold">***In this article we will be using ECCO_2_US_JUNE_1994.MD for all of our examples. It is the June 1994, US version of Ecco 2: The Tides of Time.***</p>
+
+<h2 class="underline">Table Structure</h2>
+
+<p><a href="dolphin-physics-map.png">
+    <img src="dolphin-physics-map.png" class="width_100" alt="ecco the dolphin sinewave table and physics pointer table" /></a></p>
+
+<p>The sinewave table begins at offset 0x2BC8 and is 512 bytes in size. It is made up of two parts: A Y-Axis Table, and an X-Axis Table. Both tables are used in conjunction with each other to produce X and Y offsets that are needed for transitions and ordinary movement.</p>
+
+<p>Preceding the sinewave table is another table known as the physics pointer table. It’s a table made up of 8 addresses to swappable physics functions. These functions control Ecco’s physics depending on his environment or what action he is performing. After the physics pointer table is a table signature labeled “ECCO” followed by 8 bytes of values.</p>
+
+<p>The X and Y tables are 256 bytes in size containing values that represent half a circle if used on a Cartesian coordinate system. Each byte represents a positive or negative integer with positive values that range from 0x0 through 0x7F (hexadecimal) or 0 through 127. In contrast 0xFF through 0x80 represents negative values that range from -1 through -128 (keep in mind 0xFF represents -1 on most architectures).</p>
+
+<div class='caption'>
+<span>
+
+<a href="dolphin-physics-map-highlights.png">
+    <img src="dolphin-physics-map-highlights.png" class="width_1000" alt="ecco the dolphin sinewave table with highlights" /></a>
+
+<p>The Sinewave Table is made up of two parts: The Y-Axis Sinewave Table and X-Axis Sinewave Table.</p>
+
+<a href="dolphin-xy-sinewave-tables.png">
+    <img src="dolphin-xy-sinewave-tables.png" class="width_1000" alt="ecco the dolphin sinewave table transitional arrays" /></a>
+
+<p>The labels in this example mark the begining of a transition array.</p>
+
+</span>
+</div>
+
+<h2 class="underline">Transitional Arrays</h2>
+
+<p>To better understand the structure of the X and Y Tables, I will break them up further into transition arrays. Each table contains eight transition arrays with each array being 32 bytes in size. A transition array begins with a set direction; this represents one of the eight player movable directions. The first byte of a transition has special meaning, it represents a movable direction. It’s used for both transitions and basic movement. As an example let’s examine the right transition array.</p>
+
+<p>The X and Y tables both contain a right transition array, with the X table containing an X offset and the Y table containing a Y offset. The first byte of the right transition array for the X table has a value of 0x40. While the first byte of the right transition array for the Y table contains a value of 0x0. When you combine these two values you get a direction coordinate of (X: 0x40, Y: 0x0); This value informs the game to move Ecco 4 pixels horizontally, and 0 pixels vertically (while Ecco is moving full speed). In other words, it moves Ecco 4 pixels toward the right!</p>
+
+<p>Upon close inspection of the right transition array, we can see it is followed by a down-right transition. The 20 bytes of a right transition array are actually offsets that position Ecco into the down-right direction. Following the down-right transition array is the down transition. The bytes contained in the down-right transition are (you guessed it) offsets that position Ecco facing down.</p>
+
+<h2 class="underline">Ecco 2 No Sine Example</h2>
+
+<div class='caption'>
+<span>
+
+    <a href="dolphin-xy-nosinewave-tables.png">
+        <img src="dolphin-xy-nosinewave-tables.png" alt="ecco the dolphin nosine example" /></a>
+
+    <p>A view of the different transition points on Ecco 2 No Sine.</p>
+
+</span>
+</div>
+
+<p>The best way to understand how motion physics work in Ecco the Dolphin is through example. To demonstrate this I created a hacked ROM that zeroes out the entire table except the eight key values that correspond with a direction. I have named this file <a href="ECCO_2_US_JUNE_1994-NOSINE.MD" class="yellow bold">ECCO_2_US_JUNE_1994-NOSINE.MD</a>. We will refer to it as Ecco NoSine.</p>
+
+<p>What Ecco NoSine does is only allow basic eight way movements. It causes Ecco to have to stop every time he has to transition toward a new direction. For example, if Ecco were to swim left, then changed direction to swim down, he would have to stop completely in order to make that transition. What normally occurs is Ecco would grab values from the sinewave table that would in turn smoothly reposition him. Removing all of Ecco’s transition movements causes him to suddenly stop every time he changes direction. But what would happen if we zeroed out the entire table?</p>
+
+<p>If we were to zero out the entire sinewave table it would cause Ecco to be unable to move at all. The animations for his movements and transitions would still work but he would become completely stationary. That’s because the values from the X and Y tables determine how many pixels Ecco needs to move per frame. These values are also used to update Ecco’s position during a direction transition.</p>
+
+<h2 class="underline">Theory: Understanding How the X, Y Offsets Work</h2>
+
+<p>A value in a transition array somewhat represents how many pixels Ecco can move across the screen per frame. A positive value between 0 and 0x7F (127) represents a percentage of Ecco’s maximum speed. If Ecco’s maximum speed is 8 pixels, and the value for the right direction is 0x40, then Ecco’s maximum speed in that direction will be 4 pixels. Remember 0x7F represents 100% of the maximum speed, this means 0x40 is half the maximum speed or 8 pixels.</p>
+
+<p class="yellow align_c bold">(MAX_SPEED * MAX_SPEED_PERCENTAGE) = PIXELS_PER_FRAME</p>
+
+<p class="yellow align_c bold">(8 * [0x40]) = PIXELS_PER_FRAME</p>
+
+<p class="yellow align_c bold">[0x40] <span class="underline">EQUALS</span> 50%</p>
+
+<p class="yellow align_c bold">(8 * 50%) = 4 = PIXELS_PER_FRAME</p>
+
+<p>When Ecco uses his charge attack the maximum speed for any given direction is doubled! If the player uses a charge attack in the right direction, Ecco will travel across the screen by 8 pixels! This is derived from the percentage for the right direction (0x40 or 50%) multiplied by maximum speed (8 pixels) which gives us 4 pixels multiplied by 2, or 8 pixels! </p>
+
+<p class="yellow align_c bold">(MAX_SPEED * MAX_SPEED_PERCENTAGE) * 2 = PIXELS_PER_FRAME</p>
+<p class="yellow align_c bold">(8 * [0x40]) * 2 = PIXELS_PER_FRAME</p>
+
+<p class="yellow align_c bold">[0x40] <span class="underline">EQUALS</span> 50%</p>
+
+<p class="yellow align_c bold">(8 * 50%) * 2 = 8 = PIXELS_PER_FRAME</p>
+
+<p>A negative value in a transition array works exactly like a positive value does. The only difference is a negative value represents a percentage of the maximum speed in the opposite direction. A negative range starts with 0xFF (1%) and ends with 0x80 (100%).</p>
+
+<div class='caption'>
+<span>
+<iframe width="1120" height="630"
+    src="https://www.youtube.com/embed/d1CEDhgNz_o" 
+    frameborder="0" 
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+    class="width_100"
+    allowfullscreen>
+</iframe>
+
+<p>In this video the values from Ecco's left transition arrays were swapped with values from the right transition arrays.</p>
+</span>
+</div>
+
+<h2 class="underline">Theory: How Movement Type Effects Positioning</h2>
+
+<p>How many pixels Ecco moves across screen is determined by a derived value and type of movement. A derived value is what you get when you take a value for a direction (from a transition array) and multiply it by the maximum speed. In the previous paragraph we explored how a value from a transitional array represents a percentage. Types of movement can effect a derived value. There are three types of movements: slow, fast and charge.</p>
+
+<p class="yellow align_c bold">DERIVED_VALUE <span class="underline">EQUALS</span> PIXELS_PER_FRAME</p>
+
+<p>When the player presses any button on the directional pad it causes Ecco to slowly swim across the screen. The game determines how many pixels Ecco should moved by taking the derived value and dividing it by 2. If Ecco is slowly swimming toward the right, we calculate the derived value by taking 50% (0x40) of the maximum speed (8 pixels) and divide that by 2, which gives us roughly 1 to 2 pixels (represented as 1 pixel in the game).</p>
+
+<h3>Slow Movement:</h3>
+
+<p class="yellow align_c bold">(MAX_SPEED * MAX_SPEED_PERCENTAGE) / 2 = PIXELS_PER_FRAME</p>
+
+<p>Fast and Charge movements have already been somewhat discussed but we will go over them again. When Ecco is moving fast the derived value becomes the amount of pixels to move per frame. When Ecco uses his charge attack the pixels per frame are doubled!</p>
+
+<h3>Fast Movement:</h3>
+
+<p class="yellow align_c bold">(MAX_SPEED * MAX_SPEED_PERCENTAGE) = DERIVED_VALUE OR PIXELS_PER_FRAME</p>
+
+<h3>Charge Movement:</h3>
+
+<p class="yellow align_c bold">(MAX_SPEED * MAX_SPEED_PERCENTAGE) * 2 = PIXELS_PER_FRAME</p>
+
+<p class="yellow align_c bold">DERIVED_VALUE * 2 = PIXELS_PER_FRAME</p>
+
+<div class='caption'>
+<span>
+<iframe width="1120" height="630"
+    src="https://www.youtube.com/embed/JvNBU-Lyj4w" 
+    frameborder="0" 
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+    class="width_100"
+    allowfullscreen>
+</iframe>
+
+<p>In this video Ecco's max speed percentage for the right direction is set to 0x7F the maximum value for that direction.</p>
+</span>
+</div>
+
+<h2 class="underline">Speculation: A Closer Inspection at Transitions</h2>
+
+<p>It’s difficult to say exactly how transitions work without creating a proof of concept or by inspecting the code. By inspection I am referring to allowing the code to execute and examining the process step by step. Instead I opted to further hack Ecco 2 NoSine by altering the Down-Right to Down transition.</p>
+
+<p>What I did was change the first 16 bytes of the Down-Right to Down transition with the values 0x80. This tells the game to move Ecco toward the left roughly 4 pixels per frame. I then observed Ecco transition from Down-Right to Down which caused him to move a total of 32 pixels. This was the result of only using half of the 32 bytes in a transition array. But what if I altered all 32 bytes to 0x80? I ended up doing just that, which caused Ecco to move a total of 64 pixels!</p>
+
+<div class='caption'>
+<span>
+
+    <a href="dolphin-down-right-down-1.png">
+        <img src="dolphin-down-right-down-1.png" alt="ecco the dolphin nosine example" /></a>
+
+    <p>Half of the down-right transition array is set to 0x80. This causes Ecco to move 32 pixels to the left when he changes direction from down-right to down.</p>
+
+    <a href="dolphin-down-right-down-2.png">
+        <img src="dolphin-down-right-down-2.png" alt="ecco the dolphin nosine example" /></a>
+
+    <p>All of the down-right transition array is set to 0x80. This causes Ecco to move 64 pixels to the left when he changes direction from down-right to down.</p>
+
+</span>
+</div>
+
+<p>From my observation it’s safe to assume not all of the values in a transition array are used when changing direction. If they were then Ecco would have moved a total of 128 pixels. Either that or the rules are different when Ecco transitions between movements. The Down-Right to Down transition uses a total of 4 animation frames, with a delay that occurs inbetween frames. If we combine the frames with the frame delays and got a total of 16 total frames, then multiplied those by 4 we’d end up with 64.</p>
+
+<p>The problem with this overall scenario is I only tested one frame transition. I also assumed the amount of pixels Ecco moved after a transition were correct. The way I measured the change in pixels was by taking the center of one animation and subtracting it from the center of the final animation. This could be completely incorrect and I won’t know without further testing or creating a proof of concept. If it is indeed incorrect I will append this article with the correction!</p>
+
+<h2 class="underline">Conclusion</h2>
+
+<p>What I was able to figure out was Ecco’s motion is tied to a sinewave table. This sinewave table allows Ecco to transition between directions without interrupting the flow of motion. Unfortunately some of the material presented here are either theories or speculation. Without taking what’s presented here and creating a proof of concept I won’t know for sure if what I observed is the complete picture. I am fully confident that there is enough material here to fill in most of the picture. My goal when writing this article was for those who need this resource now. As these things are put to test I hope to eventually fill in the missing gaps. For now we will wait and see.</p>
+
+<h2 class="underline">Bonus: Swappable Physics</h2>
+
+<p>Ecco uses swappable physics functions that are selected from a physics pointer table. This table has a total of 8 different physics functions that are used depending on Ecco’s actions or environment. These functions are used for basic movement, water buoyancy, out of water physics, and Ecco’s pinwheel flip.</p>
+
+<h2 class="underline">An Explaination of the Assembly</h2>
+
+<div class='caption'>
+<span>
+
+    <a href="dolphin-physics-function-pointer.png">
+        <img src="dolphin-physics-function-pointer.png" alt="ecco 2 rom viewed in radare2 reverse engineering software" /></a>
+
+    <p>A view of the Ecco 2 disassembly loaded in radare2, a program for reverse engineering software.</p>
+
+</span>
+</div>
+
+<p>As with all Mega Drive/Sega Genesis games, Ecco is made up of 68000 machine code. Through my interactive dissembler I can examine the dissembled code and understand how it works.</p>
+
+<p>On line <span class="red bold">0x00084C3A</span>, the ROM address <span class="red bold">0x2B9C</span> is loaded into register <span class="red bold">A1</span>; this is the start address of the physics pointer table.</p>
+
+<p>On line <span class="red bold">0x00084c40</span> register <span class="red bold">D0</span> is loaded with a value from somewhere in memory. On the following line <span class="red bold">D0</span> is multiplied by 4 and added to the address contained in register <span class="red bold">A1</span>. The resulting address is to one of the swappable physics functions contained in the pointer table.</p>
+
+<p>Finally on line <span class="red bold">0x00084C4A</span> a function is executed at the address contained in <span class="red bold">A1</span>.</p>
+
+<h2 class="underline">Types of Physics</h2>
+
+<p>There are a total of 8 swappable physics functions with 4 of them being the most prominent.</p>
+
+<div class='caption'>
+<span>
+<iframe width="1120" height="630"
+    src="https://www.youtube.com/embed/VwER1wYlcPU" 
+    frameborder="0" 
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+    class="width_100"
+    allowfullscreen>
+</iframe>
+<p>In this video I removed Ecco's basic underwater physics which caused him to no longer be able to move.</p>
+</span>
+</div>
+
+<p><span class="yellow bold">0x84110 – BASIC UNDERWATER PHYSICS -</span> Controls Ecco’s basic underwater movements, including acceleration, charging and position transitions.</p>
+
+<p><span class="yellow bold">0x84256 – WATER BUOYANCY –</span> This occurs when Ecco is partially above the water’s surface. It creates the effect of buoyancy, allowing him to bobble or float along the surface.</p>
+
+<div class='caption'>
+<span>
+<iframe width="1120" height="630"
+    src="https://www.youtube.com/embed/NjQ3d_t8A6s" 
+    frameborder="0" 
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+    class="width_100"
+    allowfullscreen>
+</iframe>
+<p>Ecco can no longer float, or bobble along the surface when water buoyancy is disabled like ib this example video.</p>
+</span>
+</div>
+
+<p><span class="yellow bold">0x84408 – PINWHEEL FLIP –</span> This occurs when Ecco jumps high enough and the player taps the acceleration button. It causes Ecco to do a pinwheel flip in the air.</p>
+
+<p>0x84458 – NOT DOCUMENTED YET – Triggered on water reentry.
+<br />0x84074 – NOT DOCUMENTED YET – Triggered on water reentry.</p>
+
+<p><span class="yellow bold">0x843b8 – OUT OF WATER PHYSICS –</span> This occurs when Ecco leaps out of water, causing him to fall.</p>
+
+<p>0x8400a – NOT DOCUMENTED YET  - Dummy function, doesn’t do anything, returns immediately.
+<br />0x8400c – NOT DOCUMENTED YET – A small function possibly used for chaining different physics functions together.</p>
+
+<h2 class="underline">Chained Physics</h2>
+
+<p>Different physics functions can be chained together to create a combination of effects. When Ecco jumps out of water and does a pinwheel flip, the PINWHEEL FLIP physics function is executed then switches back to the OUT OF WATER PHYSICS once the flip is complete. If the PINWHEEL FLIP physics were to be disabled then Ecco would just float in the sky. This is caused by his inability to fall due to a lack of the game being able to move down the function chain.</p>
+
+<div class='caption'>
+<span>
+<iframe width="1120" height="630"
+    src="https://www.youtube.com/embed/doTixMcMAEE" 
+    frameborder="0" 
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+    class="width_100"
+    allowfullscreen>
+</iframe>
+<p>Ecco's pin wheel flip is a chained function that has to switch to out of water physics when it's finished executing. In this video I disabled the pin wheel flip to demonstrate what happens when a chained function can't do its job.</p>
+</span>
+</div>
+
+<h2 class="underline">Download</h3>
+<ul class="bold">
+<li><a href="ECCO_2_US_JUNE_1994-NOSINE.MD">ECCO_2_US_JUNE_1994-NOSINE.MD</a></li>
+</ul>
+
+</div>
+</div>
+
+<?php include(WEB_PATH . "footer.php"); ?>
